@@ -8,6 +8,10 @@ an individual company failing never aborts the whole run (spec 00 §4).
 This module is the integration point between the four parallel build
 workstreams (see workers/CONTRACT.md) — it owns no business logic of its own
 beyond looping/job-bookkeeping/output formatting.
+
+Spec 09 additions: `pregate` command, tiered `refresh` scopes (--new/--shard/
+--all, default hot), budgeted `enrich --pending` via pregate ranking, and
+snapshot auto-download for bare `discover`.
 """
 from __future__ import annotations
 

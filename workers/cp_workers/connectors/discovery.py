@@ -444,6 +444,7 @@ def refresh_universe_company(company_number: str, client: CompaniesHouseClient |
                     "company_status": profile_payload.get("company_status"),
                     "sic_codes": profile_payload.get("sic_codes"),
                     "registered_address": profile_payload.get("registered_office_address"),
+                    "incorporation_date": profile_payload.get("date_of_creation"),
                 },
             )
         return changed
