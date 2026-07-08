@@ -1,0 +1,45 @@
+name: Backfill (nightly CH detail for new discoveries, spec 09 §3)
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # nightly 01:00 UTC — clears the discovery backlog inside the rate limit
+  workflow_dispatch: {}
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install workers package
+        working-directory: workers
+        run: pip install -e .
+      - name: Fetch CH detail for companies without any (rate-limit budgeted)
+        working-directory: workers
+        env:
+          COMPANIES_HOUSE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python -m cp_workers.cli refresh --new --max-companies 1800
+      - name: Compute signals for backfilled companies
+        working-directory: workers
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python -m cp_workers.cli compute-signals --changed-only
+      - name: Pre-gate the newly detailed companies
+        working-directory: workers
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python -m cp_workers.cli pregate
+      - name: Alert on failure
+        if: failure()
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+        working-directory: workers
+        run: python -m cp_workers.cli alert-failure --job backfill --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

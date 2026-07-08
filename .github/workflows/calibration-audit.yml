@@ -1,0 +1,32 @@
+name: Calibration audit (monthly)
+
+on:
+  schedule:
+    - cron: "0 15 1 * *" # 1st of month 15:00 UTC, after that day's other jobs
+  workflow_dispatch: {}
+
+jobs:
+  calibration-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install workers package
+        working-directory: workers
+        run: pip install -e .
+      - name: Run calibration audit
+        working-directory: workers
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m cp_workers.cli score --calibration-audit
+      - name: Alert on failure
+        if: failure()
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+        working-directory: workers
+        run: python -m cp_workers.cli alert-failure --job calibration-audit --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
